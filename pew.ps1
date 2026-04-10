@@ -11,70 +11,26 @@ $VenvDir          = ".\venv"
 $DefaultGamePath  = "C:\Program Files\Meta Horizon\Software\Software\ready-at-dawn-echo-arena"
 $DataSubPath      = "_data\5932408047"
 $PatchedOutput    = ".\patched_output"
-$LogFile          = ".\pewpew_prepare.log"
-
-# ============================================================
-# --- Logging helper ---
-# ============================================================
-function Write-Log {
-    param(
-        [string]$Message,
-        [ValidateSet("INFO","WARN","ERROR","SUCCESS","STEP")]
-        [string]$Level = "INFO"
-    )
-
-    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-    $logLine   = "[$timestamp] [$Level] $Message"
-
-    Add-Content -Path $LogFile -Value $logLine -Encoding UTF8
-
-    switch ($Level) {
-        "STEP"    { Write-Host $logLine -ForegroundColor Cyan }
-        "SUCCESS" { Write-Host $logLine -ForegroundColor Green }
-        "WARN"    { Write-Host $logLine -ForegroundColor Yellow }
-        "ERROR"   { Write-Host $logLine -ForegroundColor Red }
-        default   { Write-Host $logLine -ForegroundColor Gray }
-    }
-}
-
-function Write-LogSeparator {
-    $line = "----------------------------------------"
-    Add-Content -Path $LogFile -Value $line -Encoding UTF8
-    Write-Host $line -ForegroundColor DarkGray
-}
-
-# ============================================================
-# Initialise log file
-# ============================================================
-$null = New-Item -Path $LogFile -ItemType File -Force
-Write-Log "========================================"
-Write-Log "  Echo Arena - Archive Patcher Setup"
-Write-Log "  Log file: $LogFile"
-Write-Log "========================================"
-Write-Log "Script started by: $env:USERNAME on $env:COMPUTERNAME"
-Write-Log "PowerShell version: $($PSVersionTable.PSVersion)"
 
 # ============================================================
 # --- Step 0: Resolve game folder path ---
 # ============================================================
-Write-LogSeparator
-Write-Log "STEP 0: Resolving game folder path" "STEP"
+Write-Host ""
+Write-Host "========================================" -ForegroundColor Yellow
+Write-Host "  Echo Arena - Archive Patcher Setup" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+Write-Host ""
 
 $GameFolder = $null
 
 if (Test-Path $DefaultGamePath) {
-    Write-Log "Default game folder found: $DefaultGamePath" "SUCCESS"
+    Write-Host "Game folder found at default location:" -ForegroundColor Green
+    Write-Host "  $DefaultGamePath" -ForegroundColor White
     Write-Host ""
     $confirm = Read-Host "Is this the correct game folder? (Y/N)"
-    Write-Log "User response to default path confirmation: $confirm" "INFO"
     if ($confirm -match "^[Yy]$") {
         $GameFolder = $DefaultGamePath
-        Write-Log "User accepted default game folder." "INFO"
-    } else {
-        Write-Log "User rejected default game folder. Prompting for manual input." "INFO"
     }
-} else {
-    Write-Log "Default game folder not found at: $DefaultGamePath" "WARN"
 }
 
 if (-not $GameFolder) {
@@ -83,41 +39,36 @@ if (-not $GameFolder) {
     do {
         $inputPath = Read-Host "Path"
         $inputPath = $inputPath.Trim('"').Trim("'").Trim()
-        Write-Log "User entered path: $inputPath" "INFO"
         if (-not (Test-Path $inputPath)) {
-            Write-Log "Path not found: $inputPath. Asking again." "WARN"
             Write-Host "  Path not found. Please try again." -ForegroundColor Red
         }
     } while (-not (Test-Path $inputPath))
     $GameFolder = $inputPath
-    Write-Log "Manual game folder accepted: $GameFolder" "SUCCESS"
 }
 
 $ArchivePath = Join-Path $GameFolder $DataSubPath
-Write-Log "Archive path resolved to: $ArchivePath" "SUCCESS"
+Write-Host ""
+Write-Host "Using archive path: $ArchivePath" -ForegroundColor Green
 
 # ============================================================
 # --- Step 0b: Ask about auto-copy of patched files ---
 # ============================================================
-Write-LogSeparator
-Write-Log "STEP 0b: Auto-copy preference" "STEP"
-
 Write-Host ""
 $copyAnswer = Read-Host "Automatically copy patched files into the game folder when done? (Y/N)"
-$AutoCopy   = $copyAnswer -match "^[Yy]$"
-Write-Log "User response to auto-copy prompt: $copyAnswer" "INFO"
+$AutoCopy = $copyAnswer -match "^[Yy]$"
 
 if ($AutoCopy) {
-    Write-Log "Auto-copy ENABLED. Patched files will be copied to: $ArchivePath" "SUCCESS"
+    Write-Host "Patched files WILL be copied to: $ArchivePath" -ForegroundColor Green
 } else {
-    Write-Log "Auto-copy DISABLED. Patched files will not be copied automatically." "INFO"
+    Write-Host "Patched files will NOT be copied automatically." -ForegroundColor Gray
 }
+Write-Host ""
 
 # ============================================================
-# --- Step 1: Check if Python is already installed & usable ---
+# --- Step 1: Check if Python is already installed and usable ---
 # ============================================================
-Write-LogSeparator
-Write-Log "STEP 1: Checking for existing Python 64-bit installation" "STEP"
+Write-Host "----------------------------------------" -ForegroundColor DarkGray
+Write-Host "Checking for existing Python installation..." -ForegroundColor Cyan
 
 $PythonExe = $null
 
@@ -125,93 +76,69 @@ $PythonOnPath = Get-Command python -ErrorAction SilentlyContinue
 
 if ($PythonOnPath) {
     $detectedExe = $PythonOnPath.Source
-    Write-Log "Python found on PATH: $detectedExe" "INFO"
     try {
         $arch = & $detectedExe -c "import struct; print(struct.calcsize('P') * 8)"
         $ver  = & $detectedExe --version 2>&1
-        Write-Log "Detected Python: $ver | Architecture: ${arch}-bit" "INFO"
         if ($arch -eq "64") {
-            Write-Log "Python on PATH is 64-bit and usable." "SUCCESS"
+            Write-Host "  Found usable 64-bit Python on PATH: $detectedExe" -ForegroundColor Green
+            Write-Host "  Version: $ver" -ForegroundColor Gray
             $PythonExe = $detectedExe
         } else {
-            Write-Log "Python on PATH is 32-bit. A 64-bit install is required." "WARN"
+            Write-Host "  Found Python on PATH but it is 32-bit. Will install 64-bit." -ForegroundColor Yellow
         }
     } catch {
-        Write-Log "Python found on PATH but could not be queried: $_" "WARN"
+        Write-Host "  Python found on PATH but could not be queried. Will install fresh." -ForegroundColor Yellow
     }
 } else {
-    Write-Log "Python not found on PATH." "INFO"
+    Write-Host "  Python not found on PATH." -ForegroundColor Gray
 }
 
 if (-not $PythonExe -and (Test-Path "$PythonInstallDir\python.exe")) {
     $detectedExe = "$PythonInstallDir\python.exe"
-    Write-Log "Checking known install directory: $detectedExe" "INFO"
     try {
         $arch = & $detectedExe -c "import struct; print(struct.calcsize('P') * 8)"
         $ver  = & $detectedExe --version 2>&1
-        Write-Log "Detected Python: $ver | Architecture: ${arch}-bit" "INFO"
         if ($arch -eq "64") {
-            Write-Log "Python at install dir is 64-bit and usable." "SUCCESS"
+            Write-Host "  Found usable 64-bit Python at $detectedExe" -ForegroundColor Green
+            Write-Host "  Version: $ver" -ForegroundColor Gray
             $PythonExe = $detectedExe
         }
     } catch {
-        Write-Log "Python found at $detectedExe but could not be queried: $_" "WARN"
+        Write-Host "  Python found at $detectedExe but could not be queried. Will reinstall." -ForegroundColor Yellow
     }
 }
 
 # ============================================================
 # --- Step 2: Install Python only if needed ---
 # ============================================================
-Write-LogSeparator
-Write-Log "STEP 2: Python installation" "STEP"
+Write-Host "----------------------------------------" -ForegroundColor DarkGray
 
 if ($PythonExe) {
-    Write-Log "Skipping Python installation - already ready to use at: $PythonExe" "SUCCESS"
+    Write-Host "Skipping Python installation - already ready to use." -ForegroundColor Green
 } else {
-    Write-Log "Python 64-bit not found. Starting download of Python $PythonVersion..." "INFO"
-    Write-Log "Download URL: $PythonUrl" "INFO"
+    Write-Host "Python 64-bit not found. Downloading Python $PythonVersion..." -ForegroundColor Cyan
+    Invoke-WebRequest -Uri $PythonUrl -OutFile $PythonInstaller -UseBasicParsing
 
-    try {
-        Invoke-WebRequest -Uri $PythonUrl -OutFile $PythonInstaller -UseBasicParsing
-        Write-Log "Installer downloaded to: $PythonInstaller" "SUCCESS"
-    } catch {
-        Write-Log "Failed to download Python installer: $_" "ERROR"
-        throw
-    }
-
-    Write-Log "Running Python installer silently to: $PythonInstallDir" "INFO"
-    try {
-        $proc = Start-Process -FilePath $PythonInstaller -ArgumentList @(
-            "/quiet",
-            "InstallAllUsers=1",
-            "TargetDir=$PythonInstallDir",
-            "PrependPath=0",
-            "Include_launcher=1",
-            "Include_pip=1",
-            "Include_test=0"
-        ) -Wait -NoNewWindow -PassThru
-        Write-Log "Installer exited with code: $($proc.ExitCode)" "INFO"
-        if ($proc.ExitCode -ne 0) {
-            Write-Log "Installer returned non-zero exit code: $($proc.ExitCode)" "WARN"
-        }
-    } catch {
-        Write-Log "Python installer failed: $_" "ERROR"
-        throw
-    }
+    Start-Process -FilePath $PythonInstaller -ArgumentList @(
+        "/quiet",
+        "InstallAllUsers=1",
+        "TargetDir=$PythonInstallDir",
+        "PrependPath=0",
+        "Include_launcher=1",
+        "Include_pip=1",
+        "Include_test=0"
+    ) -Wait -NoNewWindow
 
     Remove-Item $PythonInstaller -Force
-    Write-Log "Installer temp file removed." "INFO"
-
     $PythonExe = "$PythonInstallDir\python.exe"
-    $ver = & $PythonExe --version 2>&1
-    Write-Log "Python installed successfully: $ver" "SUCCESS"
+    Write-Host "Python installed: $(& $PythonExe --version)" -ForegroundColor Green
 }
 
 # ============================================================
-# --- Step 3: Ensure Python is on PATH (if not already) ---
+# --- Step 3: Ensure Python is on PATH ---
 # ============================================================
-Write-LogSeparator
-Write-Log "STEP 3: Ensuring Python directories are on PATH" "STEP"
+Write-Host "----------------------------------------" -ForegroundColor DarkGray
+Write-Host "Checking PATH entries..." -ForegroundColor Cyan
 
 $PythonDir     = Split-Path $PythonExe -Parent
 $PythonScripts = Join-Path $PythonDir "Scripts"
@@ -220,134 +147,74 @@ foreach ($p in @($PythonDir, $PythonScripts)) {
     $MachinePath = [System.Environment]::GetEnvironmentVariable("Path", "Machine")
     if ($MachinePath -notlike "*$p*") {
         [System.Environment]::SetEnvironmentVariable("Path", "$MachinePath;$p", "Machine")
-        Write-Log "Added to Machine PATH: $p" "INFO"
+        Write-Host "  Added to Machine PATH: $p" -ForegroundColor Gray
     } else {
-        Write-Log "Already in Machine PATH: $p" "INFO"
+        Write-Host "  Already in Machine PATH: $p" -ForegroundColor Gray
     }
     if ($env:PATH -notlike "*$p*") {
         $env:PATH = "$env:PATH;$p"
-        Write-Log "Added to session PATH: $p" "INFO"
-    } else {
-        Write-Log "Already in session PATH: $p" "INFO"
+        Write-Host "  Added to session PATH: $p" -ForegroundColor Gray
     }
 }
-Write-Log "PATH configuration complete." "SUCCESS"
 
 # ============================================================
 # --- Step 4: Create virtual environment ---
 # ============================================================
-Write-LogSeparator
-Write-Log "STEP 4: Creating virtual environment at $VenvDir" "STEP"
-
-try {
-    & $PythonExe -m venv $VenvDir
-    Write-Log "Virtual environment created successfully at: $VenvDir" "SUCCESS"
-} catch {
-    Write-Log "Failed to create virtual environment: $_" "ERROR"
-    throw
-}
+Write-Host "----------------------------------------" -ForegroundColor DarkGray
+Write-Host "Creating virtual environment in $VenvDir..." -ForegroundColor Cyan
+& $PythonExe -m venv $VenvDir
 
 # ============================================================
 # --- Step 5: Activate the virtual environment ---
 # ============================================================
-Write-LogSeparator
-Write-Log "STEP 5: Activating virtual environment" "STEP"
-
+Write-Host "Activating virtual environment..." -ForegroundColor Cyan
 $ActivateScript = "$VenvDir\Scripts\Activate.ps1"
 if (-not (Test-Path $ActivateScript)) {
-    Write-Log "Activation script not found at: $ActivateScript" "ERROR"
     throw "Activation script not found at: $ActivateScript"
 }
-
-try {
-    & $ActivateScript
-    Write-Log "Virtual environment activated." "SUCCESS"
-} catch {
-    Write-Log "Failed to activate virtual environment: $_" "ERROR"
-    throw
-}
+& $ActivateScript
 
 # ============================================================
-# --- Step 6: Upgrade pip + install zstandard ---
+# --- Step 6: Upgrade pip and install zstandard ---
 # ============================================================
-Write-LogSeparator
-Write-Log "STEP 6: Upgrading pip and installing dependencies" "STEP"
+Write-Host "----------------------------------------" -ForegroundColor DarkGray
+Write-Host "Upgrading pip..." -ForegroundColor Cyan
+& "$VenvDir\Scripts\python.exe" -m pip install --upgrade pip
 
-Write-Log "Upgrading pip..." "INFO"
-try {
-    & "$VenvDir\Scripts\python.exe" -m pip install --upgrade pip 2>&1 | ForEach-Object {
-        Write-Log "  [pip] $_" "INFO"
-    }
-    Write-Log "pip upgraded successfully." "SUCCESS"
-} catch {
-    Write-Log "Failed to upgrade pip: $_" "ERROR"
-    throw
-}
-
-Write-Log "Installing zstandard..." "INFO"
-try {
-    & "$VenvDir\Scripts\pip.exe" install zstandard 2>&1 | ForEach-Object {
-        Write-Log "  [pip] $_" "INFO"
-    }
-    Write-Log "zstandard installed successfully." "SUCCESS"
-} catch {
-    Write-Log "Failed to install zstandard: $_" "ERROR"
-    throw
-}
+Write-Host "Installing zstandard..." -ForegroundColor Cyan
+& "$VenvDir\Scripts\pip.exe" install zstandard
 
 # ============================================================
 # --- Step 7: Run setuparchive.py ---
 # ============================================================
-Write-LogSeparator
-Write-Log "STEP 7: Running setuparchive.py" "STEP"
-Write-Log "Archive path argument: $ArchivePath" "INFO"
-
-try {
-    & "$VenvDir\Scripts\python.exe" setuparchive.py $ArchivePath 2>&1 | ForEach-Object {
-        Write-Log "  [python] $_" "INFO"
-    }
-    Write-Log "setuparchive.py completed." "SUCCESS"
-} catch {
-    Write-Log "setuparchive.py encountered an error: $_" "ERROR"
-    throw
-}
+Write-Host "----------------------------------------" -ForegroundColor DarkGray
+Write-Host "Running setuparchive.py..." -ForegroundColor Cyan
+Write-Host "  Archive path: $ArchivePath" -ForegroundColor Gray
+& "$VenvDir\Scripts\python.exe" setuparchive.py $ArchivePath
 
 # ============================================================
-# --- Step 8: (Optional) Copy patched files into game folder ---
+# --- Step 8: Copy patched files into game folder ---
 # ============================================================
-Write-LogSeparator
-Write-Log "STEP 8: Post-patch file copy" "STEP"
-
 if ($AutoCopy) {
-    Write-Log "Auto-copy is enabled. Checking patched output folder: $PatchedOutput" "INFO"
+    Write-Host "----------------------------------------" -ForegroundColor DarkGray
+    Write-Host "Copying patched files to game folder..." -ForegroundColor Cyan
 
     if (-not (Test-Path $PatchedOutput)) {
-        Write-Log "Patched output folder not found at $PatchedOutput. Skipping copy." "WARN"
+        Write-Host "  WARNING: Patched output folder not found at $PatchedOutput. Skipping." -ForegroundColor Red
     } else {
         $PatchedItems = Get-ChildItem -Path $PatchedOutput -Recurse -File
         if ($PatchedItems.Count -eq 0) {
-            Write-Log "No files found in $PatchedOutput. Skipping copy." "WARN"
+            Write-Host "  WARNING: No files found in $PatchedOutput. Skipping." -ForegroundColor Yellow
         } else {
-            Write-Log "Found $($PatchedItems.Count) file(s) to copy." "INFO"
-            try {
-                Copy-Item -Path "$PatchedOutput\*" -Destination $ArchivePath -Recurse -Force
-                Write-Log "Successfully copied $($PatchedItems.Count) file(s) to: $ArchivePath" "SUCCESS"
-                $PatchedItems | ForEach-Object {
-                    Write-Log "  Copied: $($_.FullName)" "INFO"
-                }
-            } catch {
-                Write-Log "Failed to copy patched files: $_" "ERROR"
-                throw
-            }
+            Copy-Item -Path "$PatchedOutput\*" -Destination $ArchivePath -Recurse -Force
+            Write-Host "  Copied $($PatchedItems.Count) file(s) to: $ArchivePath" -ForegroundColor Green
         }
     }
-} else {
-    Write-Log "Auto-copy is disabled. Skipping." "INFO"
 }
 
 # ============================================================
-Write-LogSeparator
-Write-Log "All steps completed successfully." "SUCCESS"
-Write-Log "Log saved to: $((Resolve-Path $LogFile).Path)" "INFO"
-Write-Log "========================================"
+Write-Host ""
+Write-Host "========================================" -ForegroundColor Yellow
+Write-Host "  All done!" -ForegroundColor Green
+Write-Host "========================================" -ForegroundColor Yellow
 Write-Host ""
