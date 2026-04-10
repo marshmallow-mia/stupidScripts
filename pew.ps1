@@ -135,7 +135,7 @@ if ($PythonExe) {
 }
 
 # ============================================================
-# --- Step 3: Ensure Python is on PATH ---
+# --- Step 3: Ensure Python is on session PATH ---
 # ============================================================
 Write-Host "----------------------------------------" -ForegroundColor DarkGray
 Write-Host "Checking PATH entries..." -ForegroundColor Cyan
@@ -144,16 +144,25 @@ $PythonDir     = Split-Path $PythonExe -Parent
 $PythonScripts = Join-Path $PythonDir "Scripts"
 
 foreach ($p in @($PythonDir, $PythonScripts)) {
-    $MachinePath = [System.Environment]::GetEnvironmentVariable("Path", "Machine")
-    if ($MachinePath -notlike "*$p*") {
-        [System.Environment]::SetEnvironmentVariable("Path", "$MachinePath;$p", "Machine")
-        Write-Host "  Added to Machine PATH: $p" -ForegroundColor Gray
-    } else {
-        Write-Host "  Already in Machine PATH: $p" -ForegroundColor Gray
-    }
     if ($env:PATH -notlike "*$p*") {
         $env:PATH = "$env:PATH;$p"
         Write-Host "  Added to session PATH: $p" -ForegroundColor Gray
+    } else {
+        Write-Host "  Already in PATH: $p" -ForegroundColor Gray
+    }
+
+    # Only attempt Machine PATH write if running as admin
+    $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+    if ($isAdmin) {
+        $MachinePath = [System.Environment]::GetEnvironmentVariable("Path", "Machine")
+        if ($MachinePath -notlike "*$p*") {
+            [System.Environment]::SetEnvironmentVariable("Path", "$MachinePath;$p", "Machine")
+            Write-Host "  Added to Machine PATH: $p" -ForegroundColor Gray
+        } else {
+            Write-Host "  Already in Machine PATH: $p" -ForegroundColor Gray
+        }
+    } else {
+        Write-Host "  Skipping Machine PATH update (not running as admin)." -ForegroundColor Yellow
     }
 }
 
