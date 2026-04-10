@@ -26,10 +26,8 @@ function Write-Log {
     $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
     $logLine   = "[$timestamp] [$Level] $Message"
 
-    # Always write to log file
     Add-Content -Path $LogFile -Value $logLine -Encoding UTF8
 
-    # Write to console with colour
     switch ($Level) {
         "STEP"    { Write-Host $logLine -ForegroundColor Cyan }
         "SUCCESS" { Write-Host $logLine -ForegroundColor Green }
@@ -49,12 +47,12 @@ function Write-LogSeparator {
 # Initialise log file
 # ============================================================
 $null = New-Item -Path $LogFile -ItemType File -Force
-Write-Log "========================================" "INFO"
-Write-Log "  Echo Arena - Archive Patcher Setup    " "INFO"
-Write-Log "  Log file: $LogFile                    " "INFO"
-Write-Log "========================================" "INFO"
-Write-Log "Script started by: $env:USERNAME on $env:COMPUTERNAME" "INFO"
-Write-Log "PowerShell version: $($PSVersionTable.PSVersion)" "INFO"
+Write-Log "========================================"
+Write-Log "  Echo Arena - Archive Patcher Setup"
+Write-Log "  Log file: $LogFile"
+Write-Log "========================================"
+Write-Log "Script started by: $env:USERNAME on $env:COMPUTERNAME"
+Write-Log "PowerShell version: $($PSVersionTable.PSVersion)"
 
 # ============================================================
 # --- Step 0: Resolve game folder path ---
@@ -68,7 +66,7 @@ if (Test-Path $DefaultGamePath) {
     Write-Log "Default game folder found: $DefaultGamePath" "SUCCESS"
     Write-Host ""
     $confirm = Read-Host "Is this the correct game folder? (Y/N)"
-    Write-Log "User response to default path confirmation: '$confirm'" "INFO"
+    Write-Log "User response to default path confirmation: $confirm" "INFO"
     if ($confirm -match "^[Yy]$") {
         $GameFolder = $DefaultGamePath
         Write-Log "User accepted default game folder." "INFO"
@@ -81,13 +79,13 @@ if (Test-Path $DefaultGamePath) {
 
 if (-not $GameFolder) {
     Write-Host ""
-    Write-Host "Please enter the full path to the 'ready-at-dawn-echo-arena' folder:" -ForegroundColor Cyan
+    Write-Host "Please enter the full path to the ready-at-dawn-echo-arena folder:" -ForegroundColor Cyan
     do {
         $inputPath = Read-Host "Path"
         $inputPath = $inputPath.Trim('"').Trim("'").Trim()
-        Write-Log "User entered path: '$inputPath'" "INFO"
+        Write-Log "User entered path: $inputPath" "INFO"
         if (-not (Test-Path $inputPath)) {
-            Write-Log "Path not found: '$inputPath'. Asking again." "WARN"
+            Write-Log "Path not found: $inputPath. Asking again." "WARN"
             Write-Host "  Path not found. Please try again." -ForegroundColor Red
         }
     } while (-not (Test-Path $inputPath))
@@ -107,7 +105,7 @@ Write-Log "STEP 0b: Auto-copy preference" "STEP"
 Write-Host ""
 $copyAnswer = Read-Host "Automatically copy patched files into the game folder when done? (Y/N)"
 $AutoCopy   = $copyAnswer -match "^[Yy]$"
-Write-Log "User response to auto-copy prompt: '$copyAnswer'" "INFO"
+Write-Log "User response to auto-copy prompt: $copyAnswer" "INFO"
 
 if ($AutoCopy) {
     Write-Log "Auto-copy ENABLED. Patched files will be copied to: $ArchivePath" "SUCCESS"
@@ -168,7 +166,7 @@ Write-LogSeparator
 Write-Log "STEP 2: Python installation" "STEP"
 
 if ($PythonExe) {
-    Write-Log "Skipping Python installation — already ready to use at: $PythonExe" "SUCCESS"
+    Write-Log "Skipping Python installation - already ready to use at: $PythonExe" "SUCCESS"
 } else {
     Write-Log "Python 64-bit not found. Starting download of Python $PythonVersion..." "INFO"
     Write-Log "Download URL: $PythonUrl" "INFO"
@@ -239,7 +237,7 @@ Write-Log "PATH configuration complete." "SUCCESS"
 # --- Step 4: Create virtual environment ---
 # ============================================================
 Write-LogSeparator
-Write-Log "STEP 4: Creating virtual environment at '$VenvDir'" "STEP"
+Write-Log "STEP 4: Creating virtual environment at $VenvDir" "STEP"
 
 try {
     & $PythonExe -m venv $VenvDir
@@ -324,11 +322,11 @@ if ($AutoCopy) {
     Write-Log "Auto-copy is enabled. Checking patched output folder: $PatchedOutput" "INFO"
 
     if (-not (Test-Path $PatchedOutput)) {
-        Write-Log "Patched output folder not found at '$PatchedOutput'. Skipping copy." "WARN"
+        Write-Log "Patched output folder not found at $PatchedOutput. Skipping copy." "WARN"
     } else {
         $PatchedItems = Get-ChildItem -Path $PatchedOutput -Recurse -File
         if ($PatchedItems.Count -eq 0) {
-            Write-Log "No files found in '$PatchedOutput'. Skipping copy." "WARN"
+            Write-Log "No files found in $PatchedOutput. Skipping copy." "WARN"
         } else {
             Write-Log "Found $($PatchedItems.Count) file(s) to copy." "INFO"
             try {
@@ -351,5 +349,5 @@ if ($AutoCopy) {
 Write-LogSeparator
 Write-Log "All steps completed successfully." "SUCCESS"
 Write-Log "Log saved to: $((Resolve-Path $LogFile).Path)" "INFO"
-Write-Log "========================================" "INFO"
+Write-Log "========================================"
 Write-Host ""
