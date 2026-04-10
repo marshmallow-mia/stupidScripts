@@ -65,59 +65,95 @@ if ($AutoCopy) {
 Write-Host ""
 
 # ============================================================
-# --- Step 1: Download Python 3 64-bit installer ---
+# --- Step 1: Check if Python is already installed & usable ---
 # ============================================================
 Write-Host "----------------------------------------" -ForegroundColor DarkGray
-Write-Host "Downloading Python $PythonVersion (64-bit)..." -ForegroundColor Cyan
-Invoke-WebRequest -Uri $PythonUrl -OutFile $PythonInstaller -UseBasicParsing
+Write-Host "Checking for existing Python installation..." -ForegroundColor Cyan
+
+$PythonExe = $null
+
+# First, check if 'python' is already on PATH and is 64-bit
+$PythonOnPath = Get-Command python -ErrorAction SilentlyContinue
+
+if ($PythonOnPath) {
+    $detectedExe = $PythonOnPath.Source
+    try {
+        $arch = & $detectedExe -c "import struct; print(struct.calcsize('P') * 8)"
+        $ver  = & $detectedExe --version 2>&1
+        if ($arch -eq "64") {
+            Write-Host "  Found usable 64-bit Python on PATH: $detectedExe" -ForegroundColor Green
+            Write-Host "  Version: $ver" -ForegroundColor Gray
+            $PythonExe = $detectedExe
+        } else {
+            Write-Host "  Found Python on PATH but it is 32-bit ($detectedExe). Will install 64-bit." -ForegroundColor Yellow
+        }
+    } catch {
+        Write-Host "  Python found on PATH but could not be queried. Will install fresh." -ForegroundColor Yellow
+    }
+}
+
+# If not found on PATH, check the known install directory
+if (-not $PythonExe -and (Test-Path "$PythonInstallDir\python.exe")) {
+    $detectedExe = "$PythonInstallDir\python.exe"
+    try {
+        $arch = & $detectedExe -c "import struct; print(struct.calcsize('P') * 8)"
+        $ver  = & $detectedExe --version 2>&1
+        if ($arch -eq "64") {
+            Write-Host "  Found usable 64-bit Python at $detectedExe (not yet on PATH)." -ForegroundColor Green
+            Write-Host "  Version: $ver" -ForegroundColor Gray
+            $PythonExe = $detectedExe
+        }
+    } catch {
+        Write-Host "  Python found at $detectedExe but could not be queried. Will reinstall." -ForegroundColor Yellow
+    }
+}
 
 # ============================================================
-# --- Step 2: Install Python silently ---
+# --- Step 2: Install Python only if needed ---
 # ============================================================
-Write-Host "Installing Python $PythonVersion to $PythonInstallDir..." -ForegroundColor Cyan
-Start-Process -FilePath $PythonInstaller -ArgumentList @(
-    "/quiet",
-    "InstallAllUsers=1",
-    "TargetDir=$PythonInstallDir",
-    "PrependPath=0",
-    "Include_launcher=1",
-    "Include_pip=1",
-    "Include_test=0"
-) -Wait -NoNewWindow
+if ($PythonExe) {
+    Write-Host "Skipping Python installation — already ready to use." -ForegroundColor Green
+} else {
+    Write-Host "Python 64-bit not found. Downloading and installing Python $PythonVersion..." -ForegroundColor Cyan
+    Invoke-WebRequest -Uri $PythonUrl -OutFile $PythonInstaller -UseBasicParsing
 
-Remove-Item $PythonInstaller -Force
+    Start-Process -FilePath $PythonInstaller -ArgumentList @(
+        "/quiet",
+        "InstallAllUsers=1",
+        "TargetDir=$PythonInstallDir",
+        "PrependPath=0",
+        "Include_launcher=1",
+        "Include_pip=1",
+        "Include_test=0"
+    ) -Wait -NoNewWindow
+
+    Remove-Item $PythonInstaller -Force
+    $PythonExe = "$PythonInstallDir\python.exe"
+    Write-Host "Python installed: $(& $PythonExe --version)" -ForegroundColor Green
+}
 
 # ============================================================
-# --- Step 3: Add Python to PATH ---
+# --- Step 3: Ensure Python is on PATH (if not already) ---
 # ============================================================
-Write-Host "Adding Python to PATH..." -ForegroundColor Cyan
+$PythonDir     = Split-Path $PythonExe -Parent
+$PythonScripts = Join-Path $PythonDir "Scripts"
 
-$PathsToAdd = @(
-    $PythonInstallDir,
-    "$PythonInstallDir\Scripts"
-)
-
-foreach ($p in $PathsToAdd) {
-    $CurrentMachinePath = [System.Environment]::GetEnvironmentVariable("Path", "Machine")
-    if ($CurrentMachinePath -notlike "*$p*") {
-        [System.Environment]::SetEnvironmentVariable(
-            "Path",
-            "$CurrentMachinePath;$p",
-            "Machine"
-        )
+foreach ($p in @($PythonDir, $PythonScripts)) {
+    $MachinePath = [System.Environment]::GetEnvironmentVariable("Path", "Machine")
+    if ($MachinePath -notlike "*$p*") {
+        [System.Environment]::SetEnvironmentVariable("Path", "$MachinePath;$p", "Machine")
         Write-Host "  Added to Machine PATH: $p" -ForegroundColor Gray
     }
     if ($env:PATH -notlike "*$p*") {
         $env:PATH = "$env:PATH;$p"
+        Write-Host "  Added to session PATH: $p" -ForegroundColor Gray
     }
 }
-
-$PythonExe = "$PythonInstallDir\python.exe"
-Write-Host "Python version: $(& $PythonExe --version)" -ForegroundColor Green
 
 # ============================================================
 # --- Step 4: Create virtual environment ---
 # ============================================================
+Write-Host ""
 Write-Host "Creating virtual environment in $VenvDir..." -ForegroundColor Cyan
 & $PythonExe -m venv $VenvDir
 
