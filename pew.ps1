@@ -134,47 +134,16 @@ if ($PythonExe) {
     Write-Host "Python installed: $(& $PythonExe --version)" -ForegroundColor Green
 }
 
-# ============================================================
-# --- Step 3: Ensure Python is on session PATH ---
-# ============================================================
-Write-Host "----------------------------------------" -ForegroundColor DarkGray
-Write-Host "Checking PATH entries..." -ForegroundColor Cyan
-
-$PythonDir     = Split-Path $PythonExe -Parent
-$PythonScripts = Join-Path $PythonDir "Scripts"
-
-foreach ($p in @($PythonDir, $PythonScripts)) {
-    if ($env:PATH -notlike "*$p*") {
-        $env:PATH = "$env:PATH;$p"
-        Write-Host "  Added to session PATH: $p" -ForegroundColor Gray
-    } else {
-        Write-Host "  Already in PATH: $p" -ForegroundColor Gray
-    }
-
-    # Only attempt Machine PATH write if running as admin
-    $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
-    if ($isAdmin) {
-        $MachinePath = [System.Environment]::GetEnvironmentVariable("Path", "Machine")
-        if ($MachinePath -notlike "*$p*") {
-            [System.Environment]::SetEnvironmentVariable("Path", "$MachinePath;$p", "Machine")
-            Write-Host "  Added to Machine PATH: $p" -ForegroundColor Gray
-        } else {
-            Write-Host "  Already in Machine PATH: $p" -ForegroundColor Gray
-        }
-    } else {
-        Write-Host "  Skipping Machine PATH update (not running as admin)." -ForegroundColor Yellow
-    }
-}
 
 # ============================================================
-# --- Step 4: Create virtual environment ---
+# --- Step 3: Create virtual environment ---
 # ============================================================
 Write-Host "----------------------------------------" -ForegroundColor DarkGray
 Write-Host "Creating virtual environment in $VenvDir..." -ForegroundColor Cyan
 & $PythonExe -m venv $VenvDir
 
 # ============================================================
-# --- Step 5: Activate the virtual environment ---
+# --- Step 4: Activate the virtual environment ---
 # ============================================================
 Write-Host "Activating virtual environment..." -ForegroundColor Cyan
 $ActivateScript = "$VenvDir\Scripts\Activate.ps1"
@@ -184,7 +153,7 @@ if (-not (Test-Path $ActivateScript)) {
 & $ActivateScript
 
 # ============================================================
-# --- Step 6: Upgrade pip and install zstandard ---
+# --- Step 5: Upgrade pip and install zstandard ---
 # ============================================================
 Write-Host "----------------------------------------" -ForegroundColor DarkGray
 Write-Host "Upgrading pip..." -ForegroundColor Cyan
@@ -194,7 +163,7 @@ Write-Host "Installing zstandard..." -ForegroundColor Cyan
 & "$VenvDir\Scripts\pip.exe" install zstandard
 
 # ============================================================
-# --- Step 7: Run setuparchive.py ---
+# --- Step 6: Run setuparchive.py ---
 # ============================================================
 Write-Host "----------------------------------------" -ForegroundColor DarkGray
 Write-Host "Running setuparchive.py..." -ForegroundColor Cyan
@@ -202,7 +171,7 @@ Write-Host "  Archive path: $ArchivePath" -ForegroundColor Gray
 & "$VenvDir\Scripts\python.exe" setuparchive.py $ArchivePath
 
 # ============================================================
-# --- Step 8: Copy patched files into game folder ---
+# --- Step 7: Copy patched files into game folder ---
 # ============================================================
 if ($AutoCopy) {
     Write-Host "----------------------------------------" -ForegroundColor DarkGray
